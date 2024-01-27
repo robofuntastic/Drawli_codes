@@ -3,26 +3,25 @@
 
 #define enable_pin 5
 
-#define stepPin 12
-#define dirPin 13
-#define stepPin_2 14
-#define dirPin_2 27
+#define right_stepPin 12
+#define right_dirPin 13
+#define left_stepPin 14
+#define left_dirPin 27
 #define motorInterfaceType 1
-//AccelStepper stepper; // Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 5
-AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
-AccelStepper stepper_2 = AccelStepper(motorInterfaceType, stepPin_2, dirPin_2);
+AccelStepper right_stepper = AccelStepper(motorInterfaceType, right_stepPin, right_dirPin);
+AccelStepper left_stepper = AccelStepper(motorInterfaceType, left_stepPin, left_dirPin);
 void setup()
 {  
-   stepper.setMaxSpeed(1600);
-   stepper.setSpeed(50);	
-   stepper_2.setMaxSpeed(1600);
-   stepper_2.setSpeed(50); 
+   right_stepper.setMaxSpeed(1600); //Steps per second
+   right_stepper.setSpeed(-400);	//Steps per second
+   left_stepper.setMaxSpeed(1600);
+   left_stepper.setSpeed(400); 
    pinMode(enable_pin, OUTPUT);
    digitalWrite(enable_pin, HIGH);
 }
 
 void loop()
 {  
-   stepper.runSpeed();
-   stepper_2.runSpeed();
+   right_stepper.runSpeed();
+   left_stepper.runSpeed();
 }
