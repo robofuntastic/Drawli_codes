@@ -4,7 +4,7 @@
 
 #define enable_pin 5
 const float wheel_separation = 160.0;  
-const float wheel_radius = 75.0;  
+const float wheel_radius = 37.0;  
 
 int angMotorSpeedLeftStep = 0;
 int angMotorSpeedRightStep = 0;
@@ -28,7 +28,7 @@ void setup()
 }
 
 // Function to calculate motor speeds based on robot linear and angular velocities
-void calcSpeed(int robotLinear, int robotAngular) {
+void calcSpeed(float robotLinear, float robotAngular) {
   // Convert linear and angular velocities to rad/s
   float angMotorSpeedLeft = (robotLinear - robotAngular * wheel_separation / 2) / wheel_radius;
   float angMotorSpeedRight = (robotLinear + robotAngular * wheel_separation / 2) / wheel_radius;
@@ -39,7 +39,7 @@ void calcSpeed(int robotLinear, int robotAngular) {
 }
 
 // speed in mm/s
-bool straight(int Speed, int Distance, int Dir) {
+bool Straight(int Speed, int Distance, int Dir) {
   
   calcSpeed(Speed, 0);
   //Serial.println(angMotorSpeedLeftStep, angMotorSpeedRightStep);
@@ -47,10 +47,10 @@ bool straight(int Speed, int Distance, int Dir) {
   // Set speed and direction for both steppers
   int dis = Distance*1600/(3.14*wheel_radius*2);
   
-  right_stepper.move(-dis); //- for making it right direction
+  right_stepper.move(-dis * Dir); //- for making it right direction
   right_stepper.setSpeed(angMotorSpeedRightStep);
 
-  left_stepper.move(dis);
+  left_stepper.move(dis * Dir);
   left_stepper.setSpeed(angMotorSpeedLeftStep);
   
 
@@ -61,12 +61,61 @@ bool straight(int Speed, int Distance, int Dir) {
   return true;
 }
 
+// speed degrees/s
+bool Rotate(int Speed,int Degrees, int Dir) {
+   calcSpeed(0, Speed * 3.14/180); //Converting deg/s to rad/s
+
+   float desired_angle_rad = Degrees * 3.14/180;
+   float wheel_angle = wheel_separation *  desired_angle_rad/ ( 2 * wheel_radius); // radians
+   int wheel_angle_steps = wheel_angle * 1600 / (2 * 3.14);
+   
+  right_stepper.move(-wheel_angle_steps * Dir); //- for making it right direction
+  right_stepper.setSpeed(angMotorSpeedRightStep);
+
+  left_stepper.move(-wheel_angle_steps * Dir);
+  left_stepper.setSpeed(angMotorSpeedLeftStep);
+  
+
+  while (right_stepper.distanceToGo() != 0 || left_stepper.distanceToGo() != 0) {
+    right_stepper.runSpeedToPosition();
+    left_stepper.runSpeedToPosition();
+  }
+
+  return true;
+}
+
+
+bool Circle(int Speed, int Diameter,int Degrees, int Dir) {
+   int Angular_speed = Speed/(Diameter/2);
+   calcSpeed(Speed, Angular_speed);
+   float desired_angle_rad = Degrees * 3.14/180;
+   float wheel_angle = wheel_separation *  desired_angle_rad/ ( 2 * wheel_radius); // radians
+   int wheel_angle_steps = wheel_angle * 1600 / (2 * 3.14);
+   
+  right_stepper.move(-wheel_angle_steps * Dir); //- for making it right direction
+  right_stepper.setSpeed(angMotorSpeedRightStep);
+
+  left_stepper.move(-wheel_angle_steps * Dir);
+  left_stepper.setSpeed(angMotorSpeedLeftStep);
+  
+
+  while (right_stepper.distanceToGo() != 0 || left_stepper.distanceToGo() != 0) {
+    right_stepper.runSpeedToPosition();
+    left_stepper.runSpeedToPosition();
+  }
+  
+  return true;
+}
 
 void loop()
 {  
 
-  straight(150,1000,1); //units mm/s and mm
+  Straight(150,1000,1); //units mm/s and mm
   delay(2000);
-  straight(50,-1000,1);
+  Rotate(15,175,1);
+  delay(2000);
+  Straight(50,1000,1);
+  delay(2000);
+  Rotate(30,-175,1);
   delay(2000);
 }
