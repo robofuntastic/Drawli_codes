@@ -86,7 +86,7 @@ bool Rotate(int Speed,int Degrees, int Dir) {
 }
 
 // mm/s , mm, degree
-bool Circle(int Speed, int Diameter,int Degrees, int Dir) {
+bool Circle(int Speed, int Diameter,int Degrees, int f_b, int Dir) {
   float circle_radius = Diameter/2;
   float Angular_speed = Speed/circle_radius;  //rad
   calcSpeed(Speed, Angular_speed);
@@ -97,19 +97,26 @@ bool Circle(int Speed, int Diameter,int Degrees, int Dir) {
   float right_wheel_angle = (Diameter/2 + wheel_separation/2) * (Degrees*3.14/180)/wheel_radius;
   int right_wheel_steps  = right_wheel_angle * 1600 / (2 * 3.14);
 
-
-  right_stepper.move(-right_wheel_steps * Dir); //- for making it right direction
+if (Dir == 1) //cw direction
+{
+    right_stepper.move(-right_wheel_steps * f_b); //- for making it right direction
   right_stepper.setSpeed(angMotorSpeedRightStep);
 
-  left_stepper.move(left_wheel_steps * Dir);
+  left_stepper.move(left_wheel_steps * f_b);
   left_stepper.setSpeed(angMotorSpeedLeftStep);
+}
+else{ //ccw direction
+  right_stepper.move(-left_wheel_steps * f_b); //- for making it right direction
+  right_stepper.setSpeed(angMotorSpeedLeftStep);
+
+  left_stepper.move(right_wheel_steps * f_b);
+  left_stepper.setSpeed(angMotorSpeedRightStep);
   
+}
 
   while (right_stepper.distanceToGo() != 0 || left_stepper.distanceToGo() != 0) {
     right_stepper.runSpeedToPosition();
     left_stepper.runSpeedToPosition();
-    //right_stepper.runSpeed();
-    //left_stepper.runSpeed();
   }
 
   return true;
@@ -117,8 +124,13 @@ bool Circle(int Speed, int Diameter,int Degrees, int Dir) {
 
 void loop()
 {  
-
-Circle(100, 300, 90, 1);
+Straight(100, 400, 1);
+delay(2000);
+Rotate(25, 180, -1);
+delay(2000);
+Circle(100, 300, 90, 1, 1);
+delay(2000);
+Circle(50, 200, 90, 1, -1);
 delay(5000);
 
 }
