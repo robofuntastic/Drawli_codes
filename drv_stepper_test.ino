@@ -1,7 +1,19 @@
 #include <Arduino.h>
-
+#include <WiFi.h>
+#include <WebServer.h>
 #include <AccelStepper.h>
 #include <cmath>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+const char *ssid = "RoboFuntastic";
+const char *password = "123456789";
+
+// Global variable to store the received line
+String receivedLine;
+void command_handler(String line);
+
+WebServer server(80);
 
 #define enable_pin 5
 const float wheel_separation = 137.5;  
@@ -20,16 +32,6 @@ int angMotorSpeedRightStep = 0;
 #define motorInterfaceType 1
 AccelStepper right_stepper = AccelStepper(motorInterfaceType, right_stepPin, right_dirPin);
 AccelStepper left_stepper = AccelStepper(motorInterfaceType, left_stepPin, left_dirPin);
-void setup()
-{  
-  //Serial.begin(115200); 
-   right_stepper.setMaxSpeed(6000); //Steps per second
-   left_stepper.setMaxSpeed(6000);
-
-   
-   pinMode(enable_pin, OUTPUT);
-   digitalWrite(enable_pin, HIGH);
-}
 
 // Function to calculate motor speeds based on robot linear and angular velocities
 void calcSpeed(float robotLinear, float robotAngular) {
@@ -212,56 +214,108 @@ void move_to(float x2, float y2){
 	old_bearing = new_bearing;   
 }
 
+void remote_control(float lin, float ang){
+  calcSpeed(lin*1000, ang);
+left_stepper.setSpeed(angMotorSpeedLeftStep);
+right_stepper.setSpeed(-angMotorSpeedRightStep);
+left_stepper.runSpeed();
+right_stepper.runSpeed();
+}
+
+void command_handler(String line) {
+  // Extract command and arguments
+  int index = line.indexOf(',');
+  String command = line.substring(0, index);
+  String args = line.substring(index + 1);
+
+  // Parse arguments
+  int index2 = args.indexOf(',');
+  String arg1 = args.substring(0, index2);
+  
+  // Skip over "jang" and find the next comma
+  index2 = args.indexOf(',', index2 + 1);
+  args = args.substring(index2 + 1);
+  index2 = args.indexOf(',');
+  String arg2 = args.substring(0, index2);
+
+  // Debug prints
+  //Serial.println("Command: " + command);
+  //Serial.println("Arg1: " + arg1);
+  //Serial.println("Arg2: " + arg2);
+
+  // Check if the command is "jlin" and call remote_control if it is
+  if (command == "jlin") {
+    float ang = arg2.toFloat();
+    remote_control(arg1.toFloat(), ang);
+  }
+}
 
 
+
+
+// Task function for running parrallel
+void parrallel_tasks(void *pvParameters) {
+  while (true) {
+    command_handler(receivedLine);
+    //vTaskDelay(1 / portTICK_PERIOD_MS);  // Delay for 1 
+    vTaskDelay(1);
+  }
+}
+
+void setup()
+{  
+ Serial.begin(115200);
+
+  // Connect to Wi-Fi
+  WiFi.softAP(ssid, password, 1, 0);
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+
+  // Set up stepper motors
+  right_stepper.setMaxSpeed(6000);
+  left_stepper.setMaxSpeed(6000);
+  pinMode(enable_pin, OUTPUT);
+  digitalWrite(enable_pin, HIGH);
+
+  // Start server
+  server.begin();
+  Serial.println("HTTP server started");
+  // Create a task to run the Straight function
+  xTaskCreate(
+    parrallel_tasks,
+    "parrallel_tasks",
+    10000,  // Stack size
+    NULL,
+    1,  // Priority
+    NULL
+  );
+
+}
 
 void loop()
 {  
-// Straight(100, 400, 1);
-// delay(2000);
-// Rotate(25, 180, -1);
-// delay(2000);
-// Circle(100, 300, 90, 1, 1);
-// delay(2000);
-// Circle(50, 200, 90, 1, -1);
-// delay(5000);
+  server.handleClient();
+  WiFiClient client = server.client();
+  if (client.connected()) {
+    Serial.println("Client connected");
+    while (client.connected()) {
+      if (client.available()) {
+        receivedLine = client.readStringUntil('\r');
+        //Serial.print("Received from client: ");
+        //Serial.println(receivedLine);
+        command_handler(receivedLine);
 
-	// circle ------------
-	move_to(136.738441, 145.187821);
-	move_to(134.380298, 133.732203);
-	move_to(127.595170, 123.920361);
-	move_to(117.521703, 117.417222);
-	move_to(105.521361, 115.111091);
-	move_to(93.521020, 117.417222);
-	move_to(83.447553, 123.920361);
-	move_to(76.662425, 133.732203);
-	move_to(74.304282, 145.187821);
-	move_to(76.662425, 156.643438);
-	move_to(83.447553, 166.455281);
-	move_to(93.521020, 172.958420);
-	move_to(105.521361, 175.264551);
-	move_to(117.521703, 172.958420);
-	move_to(127.595170, 166.455281);
-	move_to(134.380298, 156.643438);
-	move_to(136.738441, 145.187821);
-	move_to(136.738441, 145.187821);
 
-	// back-slash -----------
-	move_to(37.813081, 210.330315);
+        //client.println("Received from client: ");
+        //client.println(line);
+      }
+    }
+    client.stop();
+    Serial.println("Client disconnected");
+  }
+  // Your additional code for controlling the robot can go here
+  // For example, to move forward at speed 50 mm/s for 150 mm:
+  //Straight(50, 150, 1);
 
-	move_to(174.084903, 79.190066);
-
-	// slash -------------
-	move_to(37.527994, 79.190066); 
-	move_to(173.799816, 210.330315);
-
-	// square ------------
-	move_to(37.656509, 210.457146);
-	move_to(173.929525, 210.457146);
-	move_to(173.929525, 79.022220);
-	move_to(37.656509, 79.022220);
-	move_to(37.656509, 210.457146);
-
-	// home --------------
-	move_to(0.0000, 0.0000);
 }
