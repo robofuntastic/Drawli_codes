@@ -34,14 +34,15 @@ AccelStepper right_stepper = AccelStepper(motorInterfaceType, right_stepPin, rig
 AccelStepper left_stepper = AccelStepper(motorInterfaceType, left_stepPin, left_dirPin);
 
 // Function to calculate motor speeds based on robot linear and angular velocities
+//units mm/s and rad/s
 void calcSpeed(float robotLinear, float robotAngular) {
   // Convert linear and angular velocities to rad/s
   float angMotorSpeedLeft = (robotLinear - robotAngular * wheel_separation / 2) / wheel_radius;
   float angMotorSpeedRight = (robotLinear + robotAngular * wheel_separation / 2) / wheel_radius;
 
   // Convert rad/s to steps/s and store them in global variables
-  angMotorSpeedLeftStep = angMotorSpeedLeft * 1600 / (2 * 3.14);
-  angMotorSpeedRightStep = angMotorSpeedRight * 1600 / (2 * 3.14);
+  angMotorSpeedLeftStep = angMotorSpeedLeft * 1600 / (2 * PI);
+  angMotorSpeedRightStep = angMotorSpeedRight * 1600 / (2 * PI);
 }
 
 // speed in mm/s
@@ -51,7 +52,7 @@ bool Straight(int Speed, float Distance, int Dir) {
   //Serial.println(angMotorSpeedLeftStep, angMotorSpeedRightStep);
 
   // Set speed and direction for both steppers
-  int dis = Distance*1600/(3.14*wheel_radius*2);
+  int dis = Distance*1600/(PI*wheel_radius*2);
   
   right_stepper.move(-dis * Dir); //- for making it right direction
   right_stepper.setSpeed(angMotorSpeedRightStep);
@@ -69,11 +70,11 @@ bool Straight(int Speed, float Distance, int Dir) {
 
 // speed degrees/s
 bool Rotate(int Speed,int Degrees, int Dir) {
-   calcSpeed(0, Speed * 3.14/180); //Converting deg/s to rad/s
+   calcSpeed(0, Speed * PI/180); //Converting deg/s to rad/s
 
-   float desired_angle_rad = Degrees * 3.14/180;
+   float desired_angle_rad = Degrees * PI/180;
    float wheel_angle = wheel_separation *  desired_angle_rad/ ( 2 * wheel_radius); // radians
-   int wheel_angle_steps = wheel_angle * 1600 / (2 * 3.14);
+   int wheel_angle_steps = wheel_angle * 1600 / (2 * PI);
    
   right_stepper.move(-wheel_angle_steps * Dir); //- for making it right direction
   right_stepper.setSpeed(angMotorSpeedRightStep);
@@ -96,11 +97,11 @@ bool Circle(int Speed, int Diameter,int Degrees, int f_b, int Dir) {
   float Angular_speed = Speed/circle_radius;  //rad
   calcSpeed(Speed, Angular_speed);
 
-  float left_wheel_angle = (Diameter/2 - wheel_separation/2) * (Degrees*3.14/180)/wheel_radius;
-  int left_wheel_steps  = left_wheel_angle * 1600 / (2 * 3.14);
+  float left_wheel_angle = (Diameter/2 - wheel_separation/2) * (Degrees*PI/180)/wheel_radius;
+  int left_wheel_steps  = left_wheel_angle * 1600 / (2 * PI);
    
-  float right_wheel_angle = (Diameter/2 + wheel_separation/2) * (Degrees*3.14/180)/wheel_radius;
-  int right_wheel_steps  = right_wheel_angle * 1600 / (2 * 3.14);
+  float right_wheel_angle = (Diameter/2 + wheel_separation/2) * (Degrees*PI/180)/wheel_radius;
+  int right_wheel_steps  = right_wheel_angle * 1600 / (2 * PI);
 
 if (Dir == 1) //cw direction
 {
@@ -215,11 +216,16 @@ void move_to(float x2, float y2){
 }
 
 void remote_control(float lin, float ang){
-  calcSpeed(lin*1000, ang);
+  calcSpeed(lin*1000, -ang);
 left_stepper.setSpeed(angMotorSpeedLeftStep);
 right_stepper.setSpeed(-angMotorSpeedRightStep);
 left_stepper.runSpeed();
 right_stepper.runSpeed();
+  // Print the values of angMotorSpeedLeftStep and angMotorSpeedRightStep
+  // Serial.print("Left Speed: ");
+  // Serial.println(angMotorSpeedLeftStep);
+  // Serial.print("Right Speed: ");
+  // Serial.println(angMotorSpeedRightStep);
 }
 
 void command_handler(String line) {
@@ -245,8 +251,8 @@ void command_handler(String line) {
 
   // Check if the command is "jlin" and call remote_control if it is
   if (command == "jlin") {
-    float ang = arg2.toFloat();
-    remote_control(arg1.toFloat(), ang);
+    //float ang = arg2.toFloat();
+    remote_control(arg1.toFloat(), arg2.toFloat());
   }
 }
 
@@ -273,8 +279,8 @@ void setup()
   Serial.println(IP);
 
   // Set up stepper motors
-  right_stepper.setMaxSpeed(6000);
-  left_stepper.setMaxSpeed(6000);
+  right_stepper.setMaxSpeed(10000);
+  left_stepper.setMaxSpeed(10000);
   pinMode(enable_pin, OUTPUT);
   digitalWrite(enable_pin, HIGH);
 
