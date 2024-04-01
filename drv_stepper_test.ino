@@ -288,13 +288,14 @@ void setup()
   server.begin();
   Serial.println("HTTP server started");
   // Create a task to run the Straight function
-  xTaskCreate(
+  xTaskCreatePinnedToCore(
     parrallel_tasks,
     "parrallel_tasks",
     10000,  // Stack size
     NULL,
-    1,  // Priority
-    NULL
+    configMAX_PRIORITIES - 1,  // Priority
+    NULL,
+    1  // Core to run the task on (Core 0)
   );
 
 }
