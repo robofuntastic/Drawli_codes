@@ -128,6 +128,9 @@ else{ //ccw direction
   return true;
 }
 
+void move(float Distance){
+Straight(100, Distance, 1);
+}
 
 /***************************************************************************
  ROTATE
@@ -149,7 +152,68 @@ void rotate(float angle, bool turn_ccw){
 
 }
 
+/***************************************************************************
+ MOVE_TO
+ Moves robot to next X-Y co-ordinate.  Calculates the distance (steps) and 
+ a bearing (radians) from its current co-ordinate. The robot always aligns 
+ itself with the new bearing before moving.
+ ***************************************************************************/
+void move_to(float x2, float y2){
+	
+	//----------------------------------------------------------
+	// static values (contents remain between function calls)
+	//----------------------------------------------------------
+	static float x1, y1 = 0;			//intial co-ordinates
+	static float old_bearing = 0;		//current robot bearing from 3 o'clock
 
+	//----------------------------
+	// calculate distance (steps)
+	//----------------------------
+	float dx = x2 - x1;
+	float dy = y2 - y1;
+	float distance = sqrt(dx*dx + dy*dy);		//steps (pythagoras)
+
+    //----------------------------------
+	// calculate true bearing (radians)
+ 	//----------------------------------
+ 	int quadrant;
+ 	float new_bearing;							//new bearing
+ 	
+ 	if ((dx==0) & (dy==0)){quadrant = 0;}		//no change
+ 	if ((dx>0) & (dy>=0)){quadrant = 1;}
+ 	if ((dx<=0) & (dy>0)){quadrant = 2;}
+ 	if ((dx<0) & (dy<=0)){quadrant = 3;}
+ 	if ((dx>=0) & (dy<0)){quadrant = 4;}
+    switch (quadrant){
+    	case 0: {new_bearing = 0; break;}
+    	case 1: {new_bearing = 0 + asin(dy/distance); break;}
+    	case 2: {new_bearing = PI/2 + asin(-dx/distance); break;}
+    	case 3: {new_bearing = PI + asin(-dy/distance); break;}
+    	case 4: {new_bearing = 2*PI - asin(-dy/distance); break;}
+    	default: {break;}
+    }
+
+    //----------------------------------------------------------
+    // align robot with next bearing.
+    //----------------------------------------------------------
+ 	if (new_bearing < old_bearing){
+ 		rotate(old_bearing - new_bearing, CW);
+ 	} else {
+ 		rotate(new_bearing - old_bearing, CCW);
+ 	}
+
+ 	//------------------------
+	// move robot along axis
+	//------------------------
+	move(distance);								//move the robot
+
+	//------------------------
+	// update the static values	
+	//------------------------
+	x1 = x2;
+	y1 = y2;
+	old_bearing = new_bearing;   
+}
 
 void remote_control(float lin, float ang){
   calcSpeed(lin*1000, -ang);
@@ -173,24 +237,23 @@ void command_handler(String line) {
   // Parse arguments
   int index2 = args.indexOf(',');
   String arg1 = args.substring(0, index2);
-  
-  // Skip over "jang" and find the next comma
-  index2 = args.indexOf(',', index2 + 1);
+
+  // Skip over the comma and get the next argument
   args = args.substring(index2 + 1);
   index2 = args.indexOf(',');
   String arg2 = args.substring(0, index2);
 
   // Debug prints
-  //Serial.println("Command: " + command);
-  //Serial.println("Arg1: " + arg1);
-  //Serial.println("Arg2: " + arg2);
+  Serial.println("Command: " + command);
+  Serial.println("Arg1: " + arg1);
+  Serial.println("Arg2: " + arg2);
 
-  // Check if the command is "jlin" and call remote_control if it is
-  if (command == "jlin") {
-    //float ang = arg2.toFloat();
+  // Check if the command is "rc" and call remote_control if it is
+  if (command == "rc") {
     remote_control(arg1.toFloat(), arg2.toFloat());
   }
 }
+
 
 
 
