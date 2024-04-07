@@ -257,6 +257,7 @@ void remote_control(float lin, float ang) {
   // Serial.print("Right Speed: ");
   // Serial.println(angMotorSpeedRightStep);
 }
+
 String args = "0", arg1 = "0", arg2 = "0", command = "";
 
 void command_handler(String line) {
@@ -284,12 +285,11 @@ void command_handler(String line) {
 
 void execute_cmd() {
 
-  if (command == "rc") {
-    remote_control(arg1.toFloat(), arg2.toFloat());
-  }
+  // if (command == "rc") {
+  //   // remote_control(arg1.toFloat(), arg2.toFloat());
+  // }
+    remote_control(0.4, 0.3);
 }
-
-SemaphoreHandle_t xSemaphoreActivateParrallelTasks;
 
 // Task function for running parrallel
 void parrallel_tasks(void *pvParameters) {
@@ -340,10 +340,10 @@ void setup() {
   // xSemaphoreActivateParrallelTasks = xSemaphoreCreateBinary();
 
   // Connect to Wi-Fi
-  WiFi.softAP(ssid, password, 1, 0);
-  IPAddress IP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(IP);
+  // WiFi.softAP(ssid, password, 1, 0);
+  // IPAddress IP = WiFi.softAPIP();
+  // Serial.print("AP IP address: ");
+  // Serial.println(IP);
 
   Serial.println(getCpuFrequencyMhz());
   setCpuFrequencyMhz(240);
@@ -359,15 +359,15 @@ void setup() {
   digitalWrite(enable_pin, HIGH);
 
   // Create a task to run the Straight function
-  xTaskCreatePinnedToCore(
-    receive_cmds,
-    "receive_cmds",
-    1024 * 10,  // Stack size
-    NULL,
-    1,  // Priority
-    NULL,
-    0  // Core to run the task on (Core 0)
-  );
+  // xTaskCreatePinnedToCore(
+  //   receive_cmds,
+  //   "receive_cmds",
+  //   1024 * 10,  // Stack size
+  //   NULL,
+  //   1,  // Priority
+  //   NULL,
+  //   0  // Core to run the task on (Core 0)
+  // );
 
   xTaskCreatePinnedToCore(
     parrallel_tasks,
