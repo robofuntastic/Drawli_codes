@@ -383,7 +383,7 @@ void setup()
   xTaskCreatePinnedToCore(
       receive_cmds,
       "receive_cmds",
-      1024 * 5, // Stack size
+      1024 * 10, // Stack size
       NULL,
       1, // Priority
       NULL,
