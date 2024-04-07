@@ -287,58 +287,42 @@ void command_handler(String line) {
 SemaphoreHandle_t xSemaphoreActivateParrallelTasks;
 
 // Task function for running parrallel
-void parrallel_tasks(void *pvParameters) {
-  while (true) {
-    xSemaphoreTake(xSemaphoreActivateParrallelTasks, portMAX_DELAY);
-    command_handler(receivedLine);
-    // vTaskDelay(1 / portTICK_PERIOD_MS);  // Delay for 1
-  }
-}
+// void parrallel_tasks(void *pvParameters) {
+//   while (true) {
+//     xSemaphoreTake(xSemaphoreActivateParrallelTasks, portMAX_DELAY);
+//     command_handler(receivedLine);
+//     // vTaskDelay(1 / portTICK_PERIOD_MS);  // Delay for 1
+//   }
+// }
 
 void receive_cmds(void *ptr) {
 
   // Start server
-  server.begin();
-  Serial.println("HTTP server started");
+  // server.begin();
+  // Serial.println("HTTP server started");
 
   while (1) {
-    server.handleClient();
-    WiFiClient client = server.client();
-    if (client.connected()) {
-      Serial.println("Client connected");
-      while (client.connected()) {
-        if (client.available()) {
-          receivedLine = client.readStringUntil('\r');
-          // Serial.print("Received from client: ");
-          // Serial.println(receivedLine);
-          // command_handler(receivedLine);
-
-          // client.println("Received from client: ");
-          // client.println(line);
-          xSemaphoreGive(xSemaphoreActivateParrallelTasks);
-        }
-        vTaskDelay(1);
-      }
-      client.stop();
-      Serial.println("Client disconnected");
-    }
-    // Your additional code for controlling the robot can go here
-    // For example, to move forward at speed 50 mm/s for 150 mm:
-    // Straight(50, 150, 1);
-    vTaskDelay(1);
   }
+  // Your additional code for controlling the robot can go here
+  // For example, to move forward at speed 50 mm/s for 150 mm:
+  // Straight(50, 150, 1);
+  // vTaskDelay(1);
 }
+
 
 void setup() {
   Serial.begin(115200);
   /* Attempt to create a semaphore. */
-  xSemaphoreActivateParrallelTasks = xSemaphoreCreateBinary();
+  // xSemaphoreActivateParrallelTasks = xSemaphoreCreateBinary();
 
   // Connect to Wi-Fi
   WiFi.softAP(ssid, password, 1, 0);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
+
+  server.begin();
+  Serial.println("HTTP server started");
 
   // Set up stepper motors
   right_stepper.setMaxSpeed(10000);
@@ -347,26 +331,47 @@ void setup() {
   digitalWrite(enable_pin, HIGH);
 
   // Create a task to run the Straight function
-  xTaskCreatePinnedToCore(
-    receive_cmds,
-    "receive_cmds",
-    1024 * 10,  // Stack size
-    NULL,
-    1,  // Priority
-    NULL,
-    0  // Core to run the task on (Core 0)
-  );
+  // xTaskCreatePinnedToCore(
+  //   receive_cmds,
+  //   "receive_cmds",
+  //   1024 * 10,  // Stack size
+  //   NULL,
+  //   1,  // Priority
+  //   NULL,
+  //   0  // Core to run the task on (Core 0)
+  // );
 
 
-  xTaskCreatePinnedToCore(
-    parrallel_tasks,
-    "parrallel_tasks",
-    10000,  // Stack size
-    NULL,
-    1,  // Priority
-    NULL,
-    1  // Core to run the task on (Core 0)
-  );
+  // xTaskCreatePinnedToCore(
+  //   parrallel_tasks,
+  //   "parrallel_tasks",
+  //   10000,  // Stack size
+  //   NULL,
+  //   1,  // Priority
+  //   NULL,
+  //   1  // Core to run the task on (Core 0)
+  // );
 }
 void loop() {
+
+  server.handleClient();
+  WiFiClient client = server.client();
+  if (client.connected()) {
+    Serial.println("Client connected");
+    while (client.connected()) {
+      if (client.available()) {
+        receivedLine = client.readStringUntil('\r');
+        // Serial.print("Received from client: ");
+        // Serial.println(receivedLine);
+        command_handler(receivedLine);
+
+        // client.println("Received from client: ");
+        // client.println(line);
+        // xSemaphoreGive(xSemaphoreActivateParrallelTasks);
+      }
+      // vTaskDelay(1);
+    }
+    client.stop();
+    Serial.println("Client disconnected");
+  }
 }
