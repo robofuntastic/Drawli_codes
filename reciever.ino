@@ -1,14 +1,16 @@
+// ESP32 2
+
 #include <Arduino.h>
 #include <AccelStepper.h>
 #include <cmath>
 #include <HardwareSerial.h>
 
-HardwareSerial SerialBT(1); // UART port for ESP32
-
-
 // Global variable to store the received line
 String receivedLine;
 void command_handler(String line);
+
+#define TX_PIN 17 // GPIO1
+#define RX_PIN 16 // GPIO3
 
 
 #define enable_pin 5
@@ -65,9 +67,8 @@ void command_handler(String line) {
   index2 = args.indexOf(',');
   String arg2 = args.substring(0, index2);
 
-  Serial.println("Command: " + command);
-  Serial.println("Arg1: " + arg1);
-  Serial.println("Arg2: " + arg2);
+//  Serial.println("Command: " + command);
+Serial.println("Arg1: " + arg1+" Arg2: " + arg2);
    
   // Check if the command is "rc" and call remote_control if it is
   if (command == "rc") {
@@ -78,8 +79,8 @@ void command_handler(String line) {
 
 void setup()
 {  
- Serial.begin(9600);
-SerialBT.begin(9600, SERIAL_8N1, 1, 3); // UART config: baudrate, mode, TX pin, RX pin
+  Serial.begin(9600); // Initialize serial communication for debugging
+  Serial2.begin(9600, SERIAL_8N1, TX_PIN, RX_PIN); // Initialize serial communication with specified pins
 
   // Set up stepper motors
   right_stepper.setMaxSpeed(10000);
@@ -87,17 +88,16 @@ SerialBT.begin(9600, SERIAL_8N1, 1, 3); // UART config: baudrate, mode, TX pin, 
   pinMode(enable_pin, OUTPUT);
   digitalWrite(enable_pin, HIGH);
 
-
 }
 
 void loop()
 {  
-    // Read data from UART
-  if (SerialBT.available()) {
-    String receivedLine = SerialBT.readStringUntil('\n');
-    //Serial.println("Received: " + receivedLine);
-
+  if (Serial2.available()) { // Check if data is available to read on Serial2
+    
+    //Serial.println("Received: " + Serial2.readString()); // Read and print received data
+    //Serial.println("Received2: " + Serial2.readStringUntil('\n')); // Read and print received data
+    receivedLine = Serial2.readStringUntil('\n');
   }
-//command_handler(receivedLine);
-remote_control(100, 10);
+command_handler(receivedLine);
+
 }
