@@ -27,9 +27,27 @@ void loop() {
       String command = client.readStringUntil('\r');
       Serial.println("Received command: " + command);
       // Process the command here (e.g., move motors based on the received command)
+
+            if (command.startsWith("str")) {
+          delay(1000); // Wait for 1 second
+          client.println("str_ok");
+          Serial.println("Sent: str_ok");
+        }
+
+            if (command.startsWith("rot")) {
+          delay(1000); // Wait for 1 second
+          client.println("rot_ok");
+          Serial.println("Sent: rot_ok");
+        }
+
+            if (command.startsWith("cir")) {
+          delay(1000); // Wait for 1 second
+          client.println("cir_ok");
+          Serial.println("Sent: cir_ok");
+        }
+    
     }
-  } 
-  }
+  } }
 
 }
 
