@@ -20,7 +20,7 @@ void command_handler(String line);
 #define RX_PIN 17 // GPIO3
 
 
-const float wheel_separation = 125;  
+const float wheel_separation = 118;  
 const float wheel_radius = 40.5;  
 
 int angMotorSpeedLeftStep = 0;
@@ -79,9 +79,9 @@ void calcSpeed(float robotLinear, float robotAngular) {
 // speed in mm/s
 void Straight(int Speed, float Distance, int pen) {
 
-    if (pen == 1) {
+    if (pen == 0) {
       myservo.write(0);
-    } else if (pen == 0) {
+    } else if (pen == 1) {
       myservo.write(180);
     }
     
@@ -107,9 +107,9 @@ void Straight(int Speed, float Distance, int pen) {
 
 // speed degrees/s
 void Rotate(int Degrees, int  Speed, int pen) {
-        if (pen == 1) {
+        if (pen == 0) {
       myservo.write(0);
-    } else if (pen == 0) {
+    } else if (pen == 1) {
       myservo.write(180);
     }
     
@@ -136,9 +136,9 @@ void Rotate(int Degrees, int  Speed, int pen) {
 
 // mm/s , mm, degree
 void Circle( int Diameter, int Degrees, int Speed, int pen) {
-      if (pen == 1) {
+      if (pen == 0) {
       myservo.write(0);
-    } else if (pen == 0) {
+    } else if (pen == 1) {
       myservo.write(180);
     }
     
@@ -210,9 +210,9 @@ void command_handler(String line) {
   
     remote_control(arg1.toFloat(), arg2.toFloat());
     
-    if (arg3.toFloat() == 1.0) {
+    if (arg3.toFloat() == 0.0) {
       myservo.write(0);
-    } else if (arg3.toFloat() == 0) {
+    } else if (arg3.toFloat() == 1.0) {
       myservo.write(180);
     }
     
