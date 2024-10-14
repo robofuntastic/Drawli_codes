@@ -12,6 +12,15 @@
 
 Servo myservo;  // create servo object to control a servo
 
+#define BATTERY_PIN 36  // Battery voltage measurement pin
+#define R1 10000.0      // Resistor R1 value in ohms (10k)
+#define R2 2000.0       // Resistor R2 value in ohms (2k)
+#define MAX_VOLTAGE 16.25 // Maximum battery voltage
+#define MIN_VOLTAGE 13.40 // Minimum battery voltage
+
+unsigned long previousMillisBattery = 0;
+const unsigned long batteryInterval = 10000; // 1 minute interval
+
 // Global variable to store the received line
 String command;
 void command_handler(String line);
@@ -20,11 +29,17 @@ void command_handler(String line);
 #define RX_PIN 17 // GPIO3
 
 
-const float wheel_separation = 118;  
-const float wheel_radius = 40.5;  
+const float wheel_separation = 116.1;  //last 115.70
+const float wheel_radius = 38.5;  //38.7
+
+const int microstepping = 8;  
 
 int angMotorSpeedLeftStep = 0;
 int angMotorSpeedRightStep = 0;
+
+// Define global variables to store previous X and Y values
+float previousXValue = 0.0;
+float previousYValue = 0.0;
 
 #define CCW true            //default turn direction
 #define CW false            //opposite turn direction
@@ -43,7 +58,6 @@ int angMotorSpeedRightStep = 0;
 #define left_MS2 27
 
 int servoPin = 23;
-int batteryPin = 36;
 
 #define motorInterfaceType 1
 AccelStepper right_stepper = AccelStepper(motorInterfaceType, right_stepPin, right_dirPin);
@@ -72,12 +86,12 @@ void calcSpeed(float robotLinear, float robotAngular) {
   float angMotorSpeedRight = (robotLinear + robotAngular * wheel_separation / 2) / wheel_radius;
 
   // Convert rad/s to steps/s and store them in global variables
-  angMotorSpeedLeftStep = angMotorSpeedLeft * 400 / (2 * PI);
-  angMotorSpeedRightStep = angMotorSpeedRight * 400 / (2 * PI);
+  angMotorSpeedLeftStep = angMotorSpeedLeft * 200*microstepping / (2 * PI);
+  angMotorSpeedRightStep = angMotorSpeedRight * 200*microstepping / (2 * PI);
   //Serial.println(  angMotorSpeedLeft);
 }
 // speed in mm/s
-void Straight(int Speed, float Distance, int pen) {
+void Straight(int Speed, int Distance, int pen) {
 
     if (pen == 0) {
       myservo.write(0);
@@ -89,7 +103,7 @@ void Straight(int Speed, float Distance, int pen) {
   // Serial.println(angMotorSpeedLeftStep, angMotorSpeedRightStep);
 
   // Set speed and direction for both steppers
-  int dis = Distance * 400 / (PI * wheel_radius * 2);
+  int dis = Distance * 200*microstepping / (PI * wheel_radius * 2);
 
   right_stepper.move(dis);  //- for making it right direction
   right_stepper.setSpeed(angMotorSpeedRightStep);
@@ -117,7 +131,7 @@ void Rotate(int Degrees, int  Speed, int pen) {
 
   float desired_angle_rad = Degrees * PI / 180;
   float wheel_angle = wheel_separation * desired_angle_rad / (2 * wheel_radius);  // radians
-  int wheel_angle_steps = wheel_angle * 400 / (2 * PI);
+  int wheel_angle_steps = wheel_angle * 200*microstepping / (2 * PI);
 
   right_stepper.move(wheel_angle_steps ); 
   right_stepper.setSpeed(angMotorSpeedRightStep);
@@ -147,10 +161,10 @@ void Circle( int Diameter, int Degrees, int Speed, int pen) {
   calcSpeed(Speed, Angular_speed);
 
   float left_wheel_angle = (Diameter / 2 - wheel_separation / 2) * (Degrees * PI / 180) / wheel_radius;
-  int left_wheel_steps = left_wheel_angle * 400 / (2 * PI);
+  int left_wheel_steps = left_wheel_angle * 200*microstepping / (2 * PI);
 
   float right_wheel_angle = (Diameter / 2 + wheel_separation / 2) * (Degrees * PI / 180) / wheel_radius;
-  int right_wheel_steps = right_wheel_angle * 400 / (2 * PI);
+  int right_wheel_steps = right_wheel_angle * 200*microstepping / (2 * PI);
 
 
   if (Degrees > 0)  // ccw direction
@@ -176,6 +190,131 @@ void Circle( int Diameter, int Degrees, int Speed, int pen) {
  command = "st";
  send_to_esp1("cir_ok");
 }
+
+void g_move(float Distance,int pen) {
+  Straight(50, Distance, pen);
+}
+
+void g_rotate(float angle, bool turn_ccw, int pen) {
+  int dir = 1;
+  //--------------------
+  // take smallest turn
+  //--------------------
+  if (angle > PI) {  // is the interior angle smaller?
+    angle = 2 * PI - angle;
+    turn_ccw = !turn_ccw;
+  }
+  if (turn_ccw == false) {
+    dir = -1;
+  }
+  Rotate( angle * 180 / PI * dir, 20, pen);
+}
+
+void g_move_to(int x2, int y2, int z) {
+
+//Serial.printf("X: %d, Y: %d, Z: %d\n", x2, y2, z);
+
+int pen = 0;
+
+    if (z == 0) {
+    pen = 1;
+    //Serial.printf("pen 1");
+  } else {
+    pen = 0;
+    //Serial.printf("pen 0");
+  }
+
+  //----------------------------------------------------------
+  // static values (contents remain between function calls)
+  //----------------------------------------------------------
+  static float x1, y1 = 0;       // intial co-ordinates
+  static float old_bearing = 0;  // current robot bearing from 3 o'clock
+
+  //----------------------------
+  // calculate distance (steps)
+  //----------------------------
+  float dx = x2 - x1;
+  float dy = y2 - y1;
+  float distance = sqrt(dx * dx + dy * dy);  // steps (pythagoras)
+
+  //----------------------------------
+  // calculate true bearing (radians)
+  //----------------------------------
+  int quadrant;
+  float new_bearing;  // new bearing
+
+  if ((dx == 0) & (dy == 0)) {
+    quadrant = 0;
+  }  // no change
+  if ((dx > 0) & (dy >= 0)) {
+    quadrant = 1;
+  }
+  if ((dx <= 0) & (dy > 0)) {
+    quadrant = 2;
+  }
+  if ((dx < 0) & (dy <= 0)) {
+    quadrant = 3;
+  }
+  if ((dx >= 0) & (dy < 0)) {
+    quadrant = 4;
+  }
+  switch (quadrant) {
+    case 0:
+      {
+        new_bearing = 0;
+        break;
+      }
+    case 1:
+      {
+        new_bearing = 0 + asin(dy / distance);
+        break;
+      }
+    case 2:
+      {
+        new_bearing = PI / 2 + asin(-dx / distance);
+        break;
+      }
+    case 3:
+      {
+        new_bearing = PI + asin(-dy / distance);
+        break;
+      }
+    case 4:
+      {
+        new_bearing = 2 * PI - asin(-dy / distance);
+        break;
+      }
+    default:
+      {
+        break;
+      }
+  }
+
+  //----------------------------------------------------------
+  // align robot with next bearing.
+  //----------------------------------------------------------
+  if (new_bearing < old_bearing) {
+    g_rotate(old_bearing - new_bearing, CW, pen);
+  } else {
+    g_rotate(new_bearing - old_bearing, CCW, pen);
+  }
+
+  //------------------------
+  // move robot along axis
+  //------------------------
+  g_move(distance, pen);  // move the robot
+
+  //------------------------
+  // update the static values
+  //------------------------
+  x1 = x2;
+  y1 = y2;
+  old_bearing = new_bearing;
+
+  command = "st";
+  send_to_esp1("g_ok");
+}
+
 void remote_control(float lin, float ang){
   calcSpeed(lin, -ang * PI / 180);
   
@@ -277,6 +416,64 @@ Rotate(arg1.toFloat(),arg2.toFloat(),arg3.toFloat());
   String arg4 = args.substring(index2 + 1);
 Circle(arg1.toFloat(),arg2.toFloat(),arg3.toFloat(),arg4.toFloat());
 }
+
+
+  // Handling G01 Command
+  else if (line.startsWith("G01")) {
+
+      // Initialize Z value and default X, Y to the previous ones
+    float xValue = previousXValue;
+    float yValue = previousYValue;
+    float zValue = 0.0;
+
+    // Parse G01 command without commas (e.g., "G01 X1130 Y595 Z1000")
+    int xIndex = line.indexOf('X');
+    int yIndex = line.indexOf('Y');
+    int zIndex = line.indexOf('Z');
+
+    // Extract X value (if present), else use previous value
+    if (xIndex != -1) {
+      int endX = (yIndex != -1) ? yIndex : ((zIndex != -1) ? zIndex : line.length());
+      xValue = line.substring(xIndex + 1, endX).toFloat();
+      previousXValue = xValue;  // Update previous X value
+    }
+
+    // Extract Y value (if present), else use previous value
+    if (yIndex != -1) {
+      int endY = (zIndex != -1) ? zIndex : line.length();
+      yValue = line.substring(yIndex + 1, endY).toFloat();
+      previousYValue = yValue;  // Update previous Y value
+    }
+
+    // Extract Z value (if present)
+    if (zIndex != -1) {
+      zValue = line.substring(zIndex + 1).toFloat();
+    }
+    g_move_to(xValue, yValue, zValue);
+    
+    
+  }
+
+}
+
+// Function to read battery voltage
+float readBatteryVoltage() {
+  int adcValue = analogRead(BATTERY_PIN);
+  float Vout = (adcValue * 3.3) / 4095.0;  // Convert ADC value to Vout (3.3V reference)
+  float Vin = Vout * (R1 + R2) / R2;       // Calculate Vin using voltage divider formula
+  return Vin;
+}
+
+// Function to calculate battery percentage based on voltage
+float calculateBatteryPercentage(float voltage) {
+  if (voltage >= MAX_VOLTAGE) {
+    return 100.0; // 100% battery if voltage is greater than or equal to max voltage
+  }
+  if (voltage <= MIN_VOLTAGE) {
+    return 0.0;  // 0% battery if voltage is less than or equal to min voltage
+  }
+  // Map voltage to percentage between MIN_VOLTAGE and MAX_VOLTAGE
+  return ((voltage - MIN_VOLTAGE) / (MAX_VOLTAGE - MIN_VOLTAGE)) * 100.0;
 }
 
 void setup() {
@@ -305,16 +502,18 @@ void setup() {
   pinMode(right_enPin, OUTPUT);
   digitalWrite(right_enPin, LOW);
   pinMode(right_MS1, OUTPUT);
-  digitalWrite(right_MS1, HIGH);
+  digitalWrite(right_MS1, LOW);
   pinMode(right_MS2, OUTPUT);
   digitalWrite(right_MS2, LOW);
 
   pinMode(left_enPin, OUTPUT);
   digitalWrite(left_enPin, LOW);
   pinMode(left_MS1, OUTPUT);
-  digitalWrite(left_MS1, HIGH);
+  digitalWrite(left_MS1, LOW);
   pinMode(left_MS2, OUTPUT);
   digitalWrite(left_MS2, LOW);
+
+  pinMode(BATTERY_PIN, INPUT);
   
   // Set up servo
   ESP32PWM::allocateTimer(0);
@@ -326,6 +525,16 @@ void setup() {
 }
 
 void loop() {
+    unsigned long currentMillis = millis();
+    
+  // Check battery voltage every minute
+  if (currentMillis - previousMillisBattery >= batteryInterval) {
+    previousMillisBattery = currentMillis;  // Update the time marker
+    float batteryVoltage = readBatteryVoltage();
+    int batteryPercentage = calculateBatteryPercentage(batteryVoltage);
+    send_to_esp1("bat," + String(batteryPercentage));
+  }
+  
     // Buffer to hold incoming data
     uint8_t data[BUF_SIZE];
     static String commandBuffer = ""; // Buffer to accumulate command data
@@ -348,13 +557,10 @@ void loop() {
 
             // Print the complete command
             Serial.printf("Received command via UART: %s\n", command.c_str());
-            //send_to_esp1("Hello from ESP2");
         }
     }
 
     // Small delay for better serial output handling
-    //delay(100);
     command_handler(command);
-    //send_to_esp1("Hello from ESP2");
 
 }
