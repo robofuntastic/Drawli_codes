@@ -23,6 +23,9 @@ String command;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+int prevRed = -1, prevGreen = -1, prevBlue = -1;  // Variables to store previous RGB values
+
+
 void setupUART() {
   // Configure UART parameters
   const uart_config_t uart_config = {
@@ -53,35 +56,123 @@ void sendUARTData(const char* data) {
 }
 
 
+
+#define ANIMATION_INTERVAL 50  // Time between each animation step (in milliseconds)
+unsigned long previousMillis = 0;
+bool isAnimating = false;
+int animationStep = 0;  // To track the current animation step
+int sameCommandCount = 0;  // To track how many times the same RGB command is received
+
+// 5 Different LED Animations
+void animateLEDs(int preset) {
+  unsigned long currentMillis = millis();
+int red =  200;
+int green =  200;
+int blue =200;
+  // Check if it's time to update the animation
+  if (currentMillis - previousMillis >= ANIMATION_INTERVAL) {
+    previousMillis = currentMillis;  // Update the time marker
+
+    // Select an animation based on the number of times the same command is received
+    switch (preset) {
+      case 1:
+        // Animation 1: Simple fade in and out
+        for (int i = 0; i < NUM_LEDS; i++) {
+          int brightness = 128 + 127 * sin(animationStep * 0.1);
+          leds[i] = CRGB(red * brightness / 255, green * brightness / 255, blue * brightness / 255);
+          leds2[i] = CRGB(red * brightness / 255, green * brightness / 255, blue * brightness / 255);
+        }
+        break;
+      case 2:
+        // Animation 2: Blinking LEDs
+        for (int i = 0; i < NUM_LEDS; i++) {
+          leds[i] = (animationStep % 20 < 10) ? CRGB(red, green, blue) : CRGB(0, 0, 0);
+          leds2[i] = (animationStep % 20 < 10) ? CRGB(red, green, blue) : CRGB(0, 0, 0);
+        }
+        break;
+      case 3:
+        // Animation 3: Color wipe
+        for (int i = 0; i < NUM_LEDS; i++) {
+          leds[i] = (i <= animationStep % NUM_LEDS) ? CRGB(red, green, blue) : CRGB(0, 0, 0);
+          leds2[i] = (i <= animationStep % NUM_LEDS) ? CRGB(red, green, blue) : CRGB(0, 0, 0);
+        }
+        break;
+      case 4:
+        // Animation 4: Rainbow cycling
+        for (int i = 0; i < NUM_LEDS; i++) {
+          leds[i] = CHSV((animationStep + i * 10) % 255, 255, 255);  // Hue cycling
+          leds2[i] = CHSV((animationStep + i * 10) % 255, 255, 255);
+        }
+        break;
+      case 5:
+        // Animation 5: Random sparkle
+        for (int i = 0; i < NUM_LEDS; i++) {
+          if (random(10) > 7) {
+            leds[i] = CRGB(red, green, blue);
+            leds2[i] = CRGB(red, green, blue);
+          } else {
+            leds[i] = CRGB(0, 0, 0);
+            leds2[i] = CRGB(0, 0, 0);
+          }
+        }
+        break;
+    }
+    FastLED.show();
+    animationStep++;  // Move to the next step of the animation
+    if (animationStep > 100) animationStep = 0;  // Reset the animation step periodically
+  }
+}
+
+// Modify processCarMovement to handle repeated commands and trigger animations
+int animation_preset = 0;
+
+void processCarMovement(String inputValue) {
+  if (inputValue.length() > 22) {
+    inputValue = inputValue.substring(0, 22);
+  }
+
+  Serial.printf("Got value: %s\n", inputValue.c_str());
+
+  if (inputValue.startsWith("rgb")) {
+    int red, green, blue;
+    sscanf(inputValue.c_str(), "rgb,%d,%d,%d", &red, &green, &blue);
+
+      setLEDs(red, green, blue);  // Static color change
+      isAnimating = false;  // Stop animation
+ 
+  } 
+   else if (inputValue.startsWith("preset1")) {
+    animation_preset = 1;
+      isAnimating = true; 
+  }
+   else if (inputValue.startsWith("preset2")) {
+    animation_preset = 2;
+      isAnimating = true; 
+  }
+   else if (inputValue.startsWith("preset3")) {
+    animation_preset = 3;
+      isAnimating = true; 
+  }
+   else if (inputValue.startsWith("preset4")) {
+    animation_preset = 4;
+      isAnimating = true; 
+  }
+   else if (inputValue.startsWith("preset5")) {
+    animation_preset = 5;
+      isAnimating = true; 
+  }
+  else {
+    sendUARTData(inputValue.c_str());
+  }
+}
+
+// Non-blocking LED setting
 void setLEDs(int red, int green, int blue) {
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB(red, green, blue);
     leds2[i] = CRGB(red, green, blue);
   }
   FastLED.show();
-}
-
-void processCarMovement(String inputValue) {
-  // Limit the length to 18 characters
-  if (inputValue.length() > 18) {
-    inputValue = inputValue.substring(0, 18);
-  }
-  
-  // Print the value received
-  Serial.printf("Got value: %s\n", inputValue.c_str());
-
-  // Check if the data starts with "rgb"
-  if (inputValue.startsWith("rgb")) {
-    // Extract RGB values
-    int red, green, blue;
-    sscanf(inputValue.c_str(), "rgb,%d,%d,%d", &red, &green, &blue);
-
-    // Set the color of the LEDs
-    setLEDs(red, green, blue);
-  } else {
-    // Send the value via UART if it's not RGB
-    sendUARTData(inputValue.c_str());
-  }
 }
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -176,5 +267,10 @@ void loop() {
         }
     }
     
-  // Optional: Add animation or leave it static based on RGB commands
+  // Check if the animation should run
+  if (isAnimating) {
+    // Animate with the last received RGB color
+    animateLEDs(animation_preset);
+  }
+
 }
