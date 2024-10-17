@@ -41,6 +41,9 @@ int angMotorSpeedRightStep = 0;
 float previousXValue = 0.0;
 float previousYValue = 0.0;
 
+#define FORWARD true
+bool direction = FORWARD;
+
 #define CCW true            //default turn direction
 #define CW false            //opposite turn direction
 
@@ -74,7 +77,7 @@ void send_to_esp1(String message) {
     uart_write_bytes(UART_PORT, "\n", 1);
     
     // Print the message to Serial for debugging
-    Serial.printf("Sent to ESP1: %s\n", message.c_str());
+    //Serial.printf("Sent to ESP1: %s\n", message.c_str());
 }
 
 
@@ -88,7 +91,6 @@ void calcSpeed(float robotLinear, float robotAngular) {
   // Convert rad/s to steps/s and store them in global variables
   angMotorSpeedLeftStep = angMotorSpeedLeft * 200*microstepping / (2 * PI);
   angMotorSpeedRightStep = angMotorSpeedRight * 200*microstepping / (2 * PI);
-  //Serial.println(  angMotorSpeedLeft);
 }
 // speed in mm/s
 void Straight(int Speed, int Distance, int pen) {
@@ -192,7 +194,13 @@ void Circle( int Diameter, int Degrees, int Speed, int pen) {
 }
 
 void g_move(float Distance,int pen) {
+
+if(direction){
   Straight(50, Distance, pen);
+  }
+  else{
+  Straight(50, -Distance, pen);
+    }
 }
 
 void g_rotate(float angle, bool turn_ccw, int pen) {
@@ -204,6 +212,13 @@ void g_rotate(float angle, bool turn_ccw, int pen) {
     angle = 2 * PI - angle;
     turn_ccw = !turn_ccw;
   }
+
+  if (angle > PI/2){        //can we get there faster using reverse?
+    angle = PI - angle;
+    turn_ccw = !turn_ccw;
+    direction = !direction;
+  }
+
   if (turn_ccw == false) {
     dir = -1;
   }
@@ -366,6 +381,7 @@ void command_handler(String line) {
     } else if (arg1.toFloat() == -1.0) {
       myservo.write(180);
     }
+    direction = FORWARD;
   }
 
   else if (cmd == "str") {
