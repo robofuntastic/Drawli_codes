@@ -4,6 +4,7 @@
 #include <ESPAsyncWebServer.h>
 #include "driver/uart.h"
 #include <FastLED.h>
+#include <cmath>
 
 #define TX_PIN 16
 #define RX_PIN 17
@@ -25,6 +26,11 @@ AsyncWebSocket ws("/ws");
 
 int prevRed = -1, prevGreen = -1, prevBlue = -1;  // Variables to store previous RGB values
 
+const float wheel_separation = 116.1;  //last 115.70
+const float wheel_radius = 38.5;  //38.7
+const int microstepping = 8;  
+int angMotorSpeedLeftStep = 0;
+int angMotorSpeedRightStep = 0;
 
 void setupUART() {
   // Configure UART parameters
@@ -55,6 +61,15 @@ void sendUARTData(const char* data) {
   // Serial.printf("Sent via UART: %s\n", dataWithNewline.c_str());
 }
 
+void calcSpeed(float robotLinear, float robotAngular) {
+  // Convert linear and angular velocities to rad/s
+  float angMotorSpeedLeft = (robotLinear - robotAngular * wheel_separation / 2) / wheel_radius;
+  float angMotorSpeedRight = (robotLinear + robotAngular * wheel_separation / 2) / wheel_radius;
+
+  // Convert rad/s to steps/s and store them in global variables
+  angMotorSpeedLeftStep = angMotorSpeedLeft * 200*microstepping / (2 * PI);
+  angMotorSpeedRightStep = angMotorSpeedRight * 200*microstepping / (2 * PI);
+}
 
 
 #define ANIMATION_INTERVAL 50  // Time between each animation step (in milliseconds)
@@ -160,6 +175,13 @@ void processCarMovement(String inputValue) {
    else if (inputValue.startsWith("preset5")) {
     animation_preset = 5;
       isAnimating = true; 
+  }
+   else if (inputValue.startsWith("rc")) {
+    sendUARTData(inputValue.c_str());
+    animation_preset = 4;
+      isAnimating = true; 
+
+
   }
   else {
     sendUARTData(inputValue.c_str());
